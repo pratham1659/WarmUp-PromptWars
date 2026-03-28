@@ -56,6 +56,8 @@ async def process_input(
     # ── Read image bytes if provided ───────────────────────────────────────
     image_bytes = None
     image_mime = None
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
     if image is not None:
         image_mime = image.content_type
         if image_mime not in ALLOWED_MIMES:
@@ -63,7 +65,14 @@ async def process_input(
                 status_code=415,
                 detail=f"Unsupported image type '{image_mime}'. Allowed: {', '.join(ALLOWED_MIMES)}",
             )
-        image_bytes = await image.read()
+        
+        # Read file chunks to enforce size limit securely
+        content = bytearray()
+        while chunk := await image.read(1024 * 1024):  # read in 1MB chunks
+            content.extend(chunk)
+            if len(content) > MAX_FILE_SIZE:
+                raise HTTPException(status_code=413, detail="File too large. Maximum size is 5MB.")
+        image_bytes = bytes(content)
 
     # ── Pipeline stage: Input Received ─────────────────────────────────────
     pipeline.append(PipelineStage(label="Input Received", status="done", duration_ms=0))

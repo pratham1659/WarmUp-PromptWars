@@ -243,6 +243,7 @@ export default function InputCard({ onSubmit, loading, models = [], selectedMode
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="e.g. 'My car broke down on the highway and I have a job interview in 1 hour…'"
+          aria-label="Describe your situation or problem"
           maxLength={maxChars}
           disabled={loading}
         />
@@ -286,7 +287,7 @@ export default function InputCard({ onSubmit, loading, models = [], selectedMode
                   style={{ border: 0, borderRadius: 8 }}
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
-                  src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${location.lat},${location.lng}&zoom=15`}
+                  src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${location.lat},${location.lng}&zoom=15`}
                 />
                 <button
                   className="image-preview-remove"

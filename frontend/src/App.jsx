@@ -143,6 +143,7 @@ export default function App() {
             <div
               id="error-message"
               className="card animate-fade-in"
+              aria-live="polite"
               style={{
                 padding: '14px 18px',
                 borderColor: '#fecaca',

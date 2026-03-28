@@ -141,19 +141,20 @@ export default function ResultCard({ result }) {
               >
                 Suggested Actions
               </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <ul style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 0, listStyle: 'none' }}>
                 {actions.map((action, idx) => (
-                  <button
-                    key={idx}
-                    id={`action-btn-${idx}`}
-                    className="btn-action"
-                    onClick={() => console.log('Action triggered:', action)}
-                  >
-                    <span style={{ fontSize: 14 }}>{getActionIcon(action.type)}</span>
-                    {action.description}
-                  </button>
+                  <li key={idx}>
+                    <button
+                      id={`action-btn-${idx}`}
+                      className="btn-action"
+                      onClick={() => console.log('Action triggered:', action)}
+                    >
+                      <span style={{ fontSize: 14 }}>{getActionIcon(action.type)}</span>
+                      {action.description}
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           </>
         )}
