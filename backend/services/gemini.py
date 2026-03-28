@@ -9,8 +9,9 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key)
+    # Using 'gemini-1.5-flash' as it is more stable and widely supported
     _model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash-latest",
+        model_name="gemini-1.5-flash",
         generation_config={"response_mime_type": "application/json"},
     )
 else:
@@ -56,10 +57,19 @@ Return exactly this JSON shape:
 def extract_intent(user_input: str) -> dict:
     """Call Gemini to extract intent, entities and urgency from raw input."""
     if _model is None:
-        raise ValueError("GEMINI_API_KEY not configured")
+        raise ValueError("GEMINI_API_KEY not configured in .env file")
+    
     prompt = INTENT_PROMPT_TEMPLATE.format(user_input=user_input)
-    response = _model.generate_content(prompt)
-    return _safe_parse(response.text)
+    try:
+        response = _model.generate_content(prompt)
+        return _safe_parse(response.text)
+    except Exception as e:
+        error_msg = str(e)
+        if "403" in error_msg:
+            raise ValueError("Gemini API Key is invalid or has been reported as leaked. Please generate a new key at https://aistudio.google.com/app/apikey")
+        if "404" in error_msg:
+            raise ValueError(f"Model 'gemini-1.5-flash' not found or not supported. Error: {error_msg}")
+        raise ValueError(f"Gemini API Error: {error_msg}")
 
 
 # --------------------------------------------------------------------------- #
@@ -91,9 +101,18 @@ Generate 1-4 concrete, actionable steps. Infer priority from the urgency field.
 def generate_actions(intent_data: dict) -> dict:
     """Call Gemini to validate intent data and produce actionable steps."""
     if _model is None:
-        raise ValueError("GEMINI_API_KEY not configured")
+        raise ValueError("GEMINI_API_KEY not configured in .env file")
+    
     prompt = ACTION_PROMPT_TEMPLATE.format(
         intent_json=json.dumps(intent_data, indent=2)
     )
-    response = _model.generate_content(prompt)
-    return _safe_parse(response.text)
+    try:
+        response = _model.generate_content(prompt)
+        return _safe_parse(response.text)
+    except Exception as e:
+        error_msg = str(e)
+        if "403" in error_msg:
+            raise ValueError("Gemini API Key is invalid or has been reported as leaked. Please generate a new key at https://aistudio.google.com/app/apikey")
+        if "404" in error_msg:
+            raise ValueError(f"Model 'gemini-1.5-flash' not found or not supported. Error: {error_msg}")
+        raise ValueError(f"Gemini API Error: {error_msg}")
