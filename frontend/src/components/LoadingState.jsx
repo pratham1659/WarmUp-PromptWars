@@ -38,8 +38,8 @@ export default function LoadingState() {
           style={{
             width: 18,
             height: 18,
-            border: '2px solid rgba(108,99,255,0.3)',
-            borderTopColor: 'var(--accent)',
+            border: '2px solid rgba(0,0,0,0.08)',
+            borderTopColor: 'var(--text-primary)',
             borderRadius: '50%',
             flexShrink: 0,
           }}

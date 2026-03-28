@@ -1,60 +1,71 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import InputCard from './components/InputCard';
 import ResultCard from './components/ResultCard';
 import LoadingState from './components/LoadingState';
+import PipelineSidebar from './components/PipelineSidebar';
 
-// Mock response for demo / when backend is unavailable
-const MOCK_RESPONSE = {
-  intent: 'Emergency Tech Support',
-  urgency: 'critical',
-  user_message:
-    "You're in a time-sensitive situation. Your laptop isn't powering on before a critical presentation. Based on your input, I've identified the most likely causes and prepared immediate action steps to help you recover quickly.",
-  actions: [
-    { description: 'Hard reset laptop', type: 'alert' },
-    { description: 'Check charger & power', type: 'search' },
-    { description: 'Find alternate device', type: 'search' },
-    { description: 'Email slides to self', type: 'email' },
-    { description: 'Call IT support', type: 'call' },
-  ],
-};
+async function processInput({ text, imageFile, model, location }) {
+  const API_BASE = import.meta.env.VITE_API_URL || '';
 
-async function processInput({ text, imagePreview }) {
-  // Attempt to call the real backend; fall back to mock on failure
-  try {
-    const body = { input: text };
-    if (imagePreview) body.imagePreview = imagePreview;
+  const formData = new FormData();
+  if (text) formData.append('text', text);
+  if (imageFile) formData.append('image', imageFile);
+  if (model) formData.append('model', model);
+  if (location) formData.append('location', JSON.stringify(location));
 
-    const API_BASE = import.meta.env.VITE_API_URL || '';
-    const res = await fetch(`${API_BASE}/api/process`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(8000),
-    });
+  const res = await fetch(`${API_BASE}/api/process`, {
+    method: 'POST',
+    body: formData,
+  });
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch {
-    // Simulate realistic latency for the mock
-    await new Promise(r => setTimeout(r, 1400));
-    return MOCK_RESPONSE;
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Server error (HTTP ${res.status})`);
   }
+
+  return await res.json();
 }
 
 export default function App() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [pipelineStages, setPipelineStages] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [models, setModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState('');
+
+  useEffect(() => {
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    fetch(`${API_BASE}/api/models`)
+      .then(r => r.json())
+      .then(data => {
+        setModels(data.models || []);
+        if (data.models?.length) setSelectedModel(data.models[0].id);
+      })
+      .catch(() => {
+        // Fallback models if backend is unreachable
+        const fallback = [
+          { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', tier: 'free' },
+          { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', tier: 'paid' },
+          { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', tier: 'free' },
+        ];
+        setModels(fallback);
+        setSelectedModel(fallback[0].id);
+      });
+  }, []);
 
   const handleSubmit = async (input) => {
     setLoading(true);
     setResult(null);
     setError(null);
+    setPipelineStages(null);
 
     try {
-      const data = await processInput(input);
+      const data = await processInput({ ...input, model: selectedModel });
       setResult(data);
+      setPipelineStages(data.pipeline || []);
     } catch (err) {
       setError(err.message ?? 'Something went wrong. Please try again.');
     } finally {
@@ -62,95 +73,128 @@ export default function App() {
     }
   };
 
+  const modelDisplayName = models.find(m => m.id === selectedModel)?.name || 'Gemini 2.5 Flash';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Header />
+      <Header modelName={modelDisplayName} />
 
-      <main
-        style={{
-          flex: 1,
-          maxWidth: 760,
-          width: '100%',
-          margin: '0 auto',
-          padding: '32px 20px 60px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 20,
-        }}
-      >
-        {/* Hero text */}
-        <div style={{ textAlign: 'center', marginBottom: 8 }}>
-          <h2
-            style={{
-              margin: '0 0 8px',
-              fontSize: 30,
-              fontWeight: 800,
-              letterSpacing: '-0.5px',
-              color: 'var(--text-primary)',
-              lineHeight: 1.25,
-            }}
-          >
-            Turn chaos into clarity
-          </h2>
-          <p style={{ margin: 0, fontSize: 15, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            Describe any messy real-world situation — IntentBridge AI detects your intent
-            and turns it into structured, actionable steps.
-          </p>
-        </div>
+      <div className="app-layout">
+        {/* Left: Pipeline Sidebar */}
+        <PipelineSidebar
+          stages={pipelineStages}
+          loading={loading}
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(prev => !prev)}
+          modelName={modelDisplayName}
+        />
 
-        {/* Input */}
-        <InputCard onSubmit={handleSubmit} loading={loading} />
-
-        {/* Loading skeleton */}
-        {loading && <LoadingState />}
-
-        {/* Error state */}
-        {error && !loading && (
-          <div
-            id="error-message"
-            className="card animate-fade-in"
-            style={{
-              padding: 20,
-              borderColor: 'rgba(239,68,68,0.25)',
-              background: 'rgba(239,68,68,0.06)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 12,
-            }}
-          >
-            <span style={{ fontSize: 20, flexShrink: 0 }}>⚠️</span>
-            <div>
-              <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: '#f87171' }}>
-                Something went wrong
-              </p>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>{error}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Result */}
-        {result && !loading && <ResultCard result={result} />}
-
-        {/* Empty state */}
-        {!loading && !result && !error && (
-          <div
-            className="animate-fade-in"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
+        {/* Right: Main content */}
+        <main className="main-content">
+          {/* Hero */}
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <div style={{
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: 12,
-              padding: '48px 20px',
-              opacity: 0.5,
-            }}
-          >
-            <div style={{ fontSize: 40 }}>🧠</div>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
-              Your structured output will appear here
+              gap: 6,
+              padding: '4px 14px',
+              borderRadius: 20,
+              background: 'var(--accent-light)',
+              border: '1px solid rgba(217, 119, 6, 0.2)',
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--accent)',
+              marginBottom: 14,
+            }}>
+              ⚡ Powered by {modelDisplayName}
+            </div>
+            <h2
+              style={{
+                margin: '0 0 10px',
+                fontSize: 32,
+                fontWeight: 800,
+                letterSpacing: '-0.8px',
+                lineHeight: 1.2,
+                background: 'linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              Speak it. Snap it. Solve it.
+            </h2>
+            <p style={{
+              margin: 0,
+              fontSize: 14,
+              color: 'var(--text-secondary)',
+              lineHeight: 1.7,
+              maxWidth: 480,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+            }}>
+              Drop any chaotic thought, voice note, or image —
+              <br />
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>IntentBridge AI</span> turns it into a clear action plan.
             </p>
           </div>
-        )}
-      </main>
+
+          {/* Error banner — shown ABOVE the input card */}
+          {error && !loading && (
+            <div
+              id="error-message"
+              className="card animate-fade-in"
+              style={{
+                padding: '14px 18px',
+                borderColor: '#fecaca',
+                background: '#fef2f2',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 12,
+              }}
+            >
+              <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}>⚠️</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>
+                  Something went wrong
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: '#6b7280', lineHeight: 1.5, wordBreak: 'break-word' }}>
+                  {error}
+                </p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                style={{
+                  background: 'none', border: 'none', color: '#dc2626',
+                  cursor: 'pointer', fontSize: 16, padding: 2, flexShrink: 0,
+                  opacity: 0.7, transition: 'opacity 0.2s',
+                }}
+                onMouseEnter={e => e.target.style.opacity = 1}
+                onMouseLeave={e => e.target.style.opacity = 0.7}
+                aria-label="Dismiss error"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* Input */}
+          <InputCard
+            onSubmit={handleSubmit}
+            loading={loading}
+            models={models}
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
+          />
+
+          {/* Loading skeleton */}
+          {loading && <LoadingState />}
+
+          {/* Result */}
+          {result && !loading && <ResultCard result={result} />}
+
+
+        </main>
+      </div>
     </div>
   );
 }

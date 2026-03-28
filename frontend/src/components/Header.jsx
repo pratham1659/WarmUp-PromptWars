@@ -1,33 +1,31 @@
-export default function Header() {
+export default function Header({ modelName }) {
   return (
     <header
       style={{
-        padding: '20px 24px',
+        padding: '14px 24px',
         borderBottom: '1px solid var(--border-subtle)',
-        backdropFilter: 'blur(12px)',
-        background: 'rgba(15, 17, 23, 0.85)',
+        background: 'var(--bg-primary)',
         position: 'sticky',
         top: 0,
         zIndex: 50,
       }}
     >
-      <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {/* Logo mark */}
           <div
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 9,
-              background: 'linear-gradient(135deg, #6c63ff 0%, #a78bfa 100%)',
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: 'var(--text-primary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 2px 12px rgba(108,99,255,0.4)',
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
           </div>
@@ -36,13 +34,10 @@ export default function Header() {
             <h1
               style={{
                 margin: 0,
-                fontSize: 18,
+                fontSize: 17,
                 fontWeight: 700,
                 letterSpacing: '-0.3px',
-                background: 'linear-gradient(90deg, #f0f2f8 0%, #a78bfa 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
+                color: 'var(--text-primary)',
                 lineHeight: 1.2,
               }}
             >
@@ -54,18 +49,20 @@ export default function Header() {
           </div>
         </div>
 
-        <div
-          style={{
-            padding: '4px 12px',
-            borderRadius: 20,
-            background: 'rgba(108,99,255,0.12)',
-            border: '1px solid rgba(108,99,255,0.25)',
-            fontSize: 12,
-            color: '#a78bfa',
-            fontWeight: 500,
-          }}
-        >
-          AI-Powered
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div
+            style={{
+              padding: '4px 12px',
+              borderRadius: 20,
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              fontSize: 12,
+              color: 'var(--text-secondary)',
+              fontWeight: 500,
+            }}
+          >
+            {modelName || 'Gemini 2.5 Flash'}
+          </div>
         </div>
       </div>
     </header>

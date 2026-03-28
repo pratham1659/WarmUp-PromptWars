@@ -7,6 +7,10 @@ const ACTION_ICONS = {
   navigate: '🗺️',
   message: '💬',
   alert: '🚨',
+  calendar: '📅',
+  reminder: '⏰',
+  task: '✅',
+  other: '⚡',
   default: '⚡',
 };
 
@@ -37,7 +41,7 @@ export default function ResultCard({ result }) {
       {/* Card header */}
       <div
         style={{
-          padding: '14px 20px 12px',
+          padding: '12px 20px 10px',
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           alignItems: 'center',
@@ -51,8 +55,7 @@ export default function ResultCard({ result }) {
               width: 8,
               height: 8,
               borderRadius: '50%',
-              background: '#4ade80',
-              boxShadow: '0 0 8px rgba(74, 222, 128, 0.5)',
+              background: '#16a34a',
             }}
           />
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>
@@ -144,10 +147,7 @@ export default function ResultCard({ result }) {
                     key={idx}
                     id={`action-btn-${idx}`}
                     className="btn-action"
-                    onClick={() => {
-                      // Mock: in a real app dispatch action.type
-                      console.log('Action triggered:', action);
-                    }}
+                    onClick={() => console.log('Action triggered:', action)}
                   >
                     <span style={{ fontSize: 14 }}>{getActionIcon(action.type)}</span>
                     {action.description}
