@@ -1,0 +1,15 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'VITE_API_URL=${_BACKEND_URL}'
+      - '-t'
+      - 'gcr.io/${PROJECT_ID}/frontend'
+      - '.'
+images:
+  - 'gcr.io/${PROJECT_ID}/frontend'
+substitutions:
+  _BACKEND_URL: ''
+options:
+  substitution_option: 'ALLOW_LOOSE'
