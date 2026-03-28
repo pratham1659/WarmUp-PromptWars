@@ -25,7 +25,8 @@ async function processInput({ text, imagePreview }) {
     const body = { text };
     if (imagePreview) body.imagePreview = imagePreview;
 
-    const res = await fetch('/api/process', {
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const res = await fetch(`${API_BASE}/api/process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
