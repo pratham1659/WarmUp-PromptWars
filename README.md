@@ -12,16 +12,16 @@ IntentBridge AI is a powerful tool designed to process messy, real-world inputs 
 - **Urgency Detection**: Classifies requests based on priority (e.g., critical, high, medium, low).
 - **Actionable Steps**: Generates a list of concrete tasks to resolve the situation.
 - **Structured Output**: Provides clean JSON responses ready for integration.
-- **Multimodal Support**: Capable of processing both text and images (coming soon/integrated).
+- **Modern UI**: A sleek, responsive React interface with voice and image input support.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React, Vite, Vanilla CSS
+- **Frontend**: React 18, Vite, Vanilla CSS
 - **Backend**: FastAPI (Python 3.10+)
-- **AI Engine**: Google Gemini API
-- **Tooling**: Node.js, npm, pip
+- **AI Engine**: Google Gemini API (model: `gemini-1.5-flash`)
+- **Tooling**: Node.js, npm, pip, Uvicorn
 
 ---
 
@@ -31,14 +31,32 @@ IntentBridge AI is a powerful tool designed to process messy, real-world inputs 
 .
 ├── backend/            # FastAPI Backend
 │   ├── routes/         # API Endpoints
-│   ├── services/       # Gemini AI Integration
-│   ├── schemas/        # Pydantic Models
-│   └── main.py         # App Entry Point
+│   ├── services/       # Gemini AI Integration (Two-step pipeline)
+│   ├── schemas/        # Pydantic (Request/Response) Models
+│   └── main.py         # App Entry Point (CORS Enabled)
 ├── frontend/           # React Frontend (Vite)
-│   ├── src/            # Components & Logic
+│   ├── src/            # Components & Application Logic
 │   └── index.html      # Main HTML
-└── prompts/            # AI Prompt Templates (Ignored in Git)
+└── prompts/            # AI Prompt Templates & Documentation
 ```
+
+---
+
+## 🧠 How it Works
+
+IntentBridge uses a **Two-Step AI Pipeline** to ensure accuracy and reliability.
+
+```mermaid
+graph TD
+    A[User Raw Input] --> B[Step 1: Intent Extraction]
+    B -->|Gemini API| C[Intent, Entities, Urgency]
+    C --> D[Step 2: Action Generation]
+    D -->|Gemini API| E[Structured Actions & User Message]
+    E --> F[Vibrant UI Display]
+```
+
+1. **Extraction**: The first step analyzes the raw input to understand *what* the user wants and *how urgent* it is.
+2. **Execution**: The second step takes those parameters and generates *concrete*, *actionable* steps like creating calendar events, sending emails, or setting reminders.
 
 ---
 
@@ -57,8 +75,9 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and add your GEMINI_API_KEY
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8000
 ```
+API Documentation will be available at: `http://localhost:8000/docs`
 
 ### 3. Frontend Setup
 ```bash
@@ -66,31 +85,39 @@ cd frontend
 npm install
 npm run dev
 ```
-The app will be available at `http://localhost:5173`.
+The application will be available at `http://localhost:5173`.
 
 ---
 
 ## 🔌 API Documentation
 
-### POST `/api/process`
+### `POST /api/process`
 Processes raw input to return structured data.
 
 **Request Body:**
 ```json
 {
-  "text": "My laptop won't turn on and I have a presentation in 10 minutes!"
+  "input": "My laptop won't turn on and I have a presentation in 10 minutes!"
 }
 ```
 
 **Successful Response:**
 ```json
 {
-  "intent": "Emergency Tech Support",
-  "urgency": "critical",
-  "user_message": "Based on your input, I've prepared immediate action steps...",
+  "intent": "emergency tech support",
+  "urgency": "high",
+  "user_message": "I'll help you troubleshoot your laptop immediately.",
   "actions": [
-    { "description": "Hard reset laptop", "type": "alert" },
-    { "description": "Check charger & power", "type": "search" }
+    {
+      "description": "Perform a hard reset (hold power button for 30s)",
+      "type": "task",
+      "priority": "high"
+    },
+    {
+      "description": "Check power cable and battery status",
+      "type": "task",
+      "priority": "high"
+    }
   ]
 }
 ```
@@ -99,3 +126,4 @@ Processes raw input to return structured data.
 
 ## 📝 License
 MIT License. Created for **WarmUp-PromptWars**.
+
