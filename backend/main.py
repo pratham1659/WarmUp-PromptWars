@@ -8,16 +8,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
+import os
+
 # ── CORS ───────────────────────────────────────────────────────────────────
-# Allow the Vite React frontend running on localhost:5173 (and 3000 as fallback)
+# Read origins from env var (comma-separated) or fall back to dev defaults.
+# For Cloud Run, set ALLOWED_ORIGINS=* or the specific frontend URL.
+_default_origins = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+_origins = os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=[o.strip() for o in _origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -14,6 +14,9 @@ RUN npm install
 COPY . .
 
 # Build the application
+# Accept backend URL as a build argument for production deployments
+ARG VITE_API_URL=""
+ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 
 # Stage 2: Serve the application with Nginx
