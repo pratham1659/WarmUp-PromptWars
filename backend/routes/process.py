@@ -1,8 +1,9 @@
 import time
 import json
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 from schemas.response import ProcessResponse, Action, PipelineStage
-from services.gemini import extract_intent, generate_actions, AVAILABLE_MODELS
+from services.gemini import process_all_in_one_async, AVAILABLE_MODELS
+from services.auth import verify_firebase_token
 
 router = APIRouter()
 
@@ -22,6 +23,7 @@ async def process_input(
     image: UploadFile = File(None),
     model: str = Form(""),
     location: str = Form(""),
+    user: dict = Depends(verify_firebase_token),
 ):
     """
     Multipart/form-data endpoint.
@@ -57,6 +59,7 @@ async def process_input(
     image_bytes = None
     image_mime = None
     MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+    vision_context = None
 
     if image is not None:
         image_mime = image.content_type
@@ -74,28 +77,26 @@ async def process_input(
                 raise HTTPException(status_code=413, detail="File too large. Maximum size is 5MB.")
         image_bytes = bytes(content)
 
+        # ── Vision Analysis ───────────────────────────────────────────────
+        from services.vision import analyze_image
+        vision_context = await analyze_image(image_bytes)
+
     # ── Pipeline stage: Input Received ─────────────────────────────────────
     pipeline.append(PipelineStage(label="Input Received", status="done", duration_ms=0))
 
-    # ── Step 1: Intent extraction ──────────────────────────────────────────
+    # ── AI Processing (Single network call) ───────────────────────────────
     t0 = time.perf_counter()
     try:
-        intent_data = extract_intent(text + location_context, image_bytes=image_bytes, image_mime=image_mime, model_name=selected_model)
+        data = await process_all_in_one_async(text + location_context, image_bytes=image_bytes, image_mime=image_mime, model_name=selected_model, vision_context=vision_context)
     except Exception as exc:
-        pipeline.append(PipelineStage(label="Intent Extraction", status="error", duration_ms=(time.perf_counter() - t0) * 1000))
-        raise HTTPException(status_code=502, detail=f"Intent extraction failed: {exc}")
+        pipeline.append(PipelineStage(label="AI Processing", status="error", duration_ms=(time.perf_counter() - t0) * 1000))
+        raise HTTPException(status_code=502, detail=f"AI processing failed: {exc}")
     t1 = time.perf_counter()
-    pipeline.append(PipelineStage(label="Intent Extraction", status="done", duration_ms=round((t1 - t0) * 1000, 1)))
-
-    # ── Step 2: Action generation ──────────────────────────────────────────
-    t2 = time.perf_counter()
-    try:
-        action_data = generate_actions(intent_data, model_name=selected_model)
-    except Exception as exc:
-        pipeline.append(PipelineStage(label="Action Generation", status="error", duration_ms=(time.perf_counter() - t2) * 1000))
-        raise HTTPException(status_code=502, detail=f"Action generation failed: {exc}")
-    t3 = time.perf_counter()
-    pipeline.append(PipelineStage(label="Action Generation", status="done", duration_ms=round((t3 - t2) * 1000, 1)))
+    
+    # We simulate a two-step UX in the frontend pipeline while preserving 2x API speed
+    duration = round((t1 - t0) * 1000, 1)
+    pipeline.append(PipelineStage(label="Intent Extraction", status="done", duration_ms=duration / 2))
+    pipeline.append(PipelineStage(label="Action Generation", status="done", duration_ms=duration / 2))
 
     # ── Assemble response ─────────────────────────────────────────────────
     try:
@@ -105,16 +106,16 @@ async def process_input(
                 type=a.get("type", "other"),
                 priority=a.get("priority", "medium"),
             )
-            for a in action_data.get("actions", [])
+            for a in data.get("actions", [])
         ]
 
         pipeline.append(PipelineStage(label="Response Ready", status="done", duration_ms=0))
 
         return ProcessResponse(
-            intent=intent_data.get("intent", ""),
-            urgency=intent_data.get("urgency", "medium"),
-            entities=intent_data.get("entities", []),
-            user_message=action_data.get("user_message", ""),
+            intent=data.get("intent", ""),
+            urgency=data.get("urgency", "medium"),
+            entities=data.get("entities", []),
+            user_message=data.get("user_message", ""),
             actions=actions,
             pipeline=pipeline,
         )

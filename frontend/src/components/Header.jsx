@@ -1,4 +1,8 @@
+import { useAuth } from '../context/AuthContext';
+
 export default function Header({ modelName }) {
+  const { currentUser, logout } = useAuth();
+  
   return (
     <header
       style={{
@@ -50,6 +54,28 @@ export default function Header({ modelName }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Login Status */}
+          {currentUser && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 10, borderRight: '1px solid var(--border-subtle)' }}>
+              <img 
+                src={currentUser.photoURL || 'https://via.placeholder.com/32'} 
+                alt="avatar" 
+                title={currentUser.email}
+                style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} 
+              />
+              <button 
+                onClick={logout} 
+                style={{
+                  background: 'none', border: 'none', fontSize: 12, 
+                  color: 'var(--text-secondary)', cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Sign Out
+              </button>
+            </div>
+          )}
+          
           <div
             style={{
               padding: '4px 12px',

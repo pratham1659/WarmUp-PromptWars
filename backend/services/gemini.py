@@ -1,8 +1,23 @@
 import os
 import json
-import re
 import google.generativeai as genai
+from typing import List, TypedDict
 from dotenv import load_dotenv
+
+
+class ActionSchema(TypedDict):
+    description: str
+    type: str  # 'calendar', 'email', 'reminder', 'task', 'search', 'other'
+    priority: str  # 'low', 'medium', 'high'
+
+
+class OutputSchema(TypedDict):
+    intent: str
+    entities: List[str]
+    urgency: str  # 'low', 'medium', 'high'
+    user_message: str
+    actions: List[ActionSchema]
+
 
 load_dotenv()
 
@@ -22,14 +37,21 @@ AVAILABLE_MODELS = [
 ]
 
 
-def _get_model(model_name: str = None):
+def _get_model(model_name: str = None, system_instruction: str = None):
     """Get a GenerativeModel instance for the given model name."""
     if not api_key:
         raise ValueError("GEMINI_API_KEY not configured in .env file")
     name = model_name or DEFAULT_MODEL
+    
+    config = {
+        "response_mime_type": "application/json",
+        "response_schema": OutputSchema,
+    }
+    
     return genai.GenerativeModel(
         model_name=name,
-        generation_config={"response_mime_type": "application/json"},
+        system_instruction=system_instruction,
+        generation_config=config,
     )
 
 
@@ -37,16 +59,7 @@ def _get_model(model_name: str = None):
 #  Helpers
 # --------------------------------------------------------------------------- #
 
-def _safe_parse(text: str) -> dict:
-    """Try to extract valid JSON from the model's response."""
-    text = text.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
-            return json.loads(match.group())
-        raise ValueError(f"Could not parse JSON from Gemini response: {text!r}")
+# `_safe_parse` has been removed as we use native JSON response_schema
 
 
 def _build_image_part(image_bytes: bytes, mime_type: str) -> dict:
@@ -60,94 +73,60 @@ def _build_image_part(image_bytes: bytes, mime_type: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-#  Step 1 – Intent extraction (supports text + optional image)
+#  Unified Pipeline – Process All in One
 # --------------------------------------------------------------------------- #
 
-INTENT_PROMPT_TEMPLATE = """
-You are an intent extraction engine. Analyze the user's raw input and return ONLY valid JSON — no markdown, no explanation.
+SYSTEM_INSTRUCTION = """
+You are an intent extraction and action planning engine.
+Analyze the user's raw input (and optional image).
 
-User input: {user_input}
-
-{image_context}
-
-Return exactly this JSON shape:
-{{
+Return ONLY valid JSON matching this exact shape — no markdown, no explanation:
+{
   "intent": "<short label for what the user wants to accomplish>",
   "entities": ["<key noun / entity 1>", "<key noun / entity 2>"],
-  "urgency": "<low | medium | high>"
-}}
-"""
-
-
-def extract_intent(user_input: str, image_bytes: bytes = None, image_mime: str = None, model_name: str = None) -> dict:
-    """Call Gemini to extract intent, entities and urgency from raw input.
-    Supports multimodal: text-only or text + image.
-    """
-    model = _get_model(model_name)
-
-    image_context = "An image has also been provided by the user. Analyze it together with the text." if image_bytes else ""
-    prompt_text = INTENT_PROMPT_TEMPLATE.format(user_input=user_input or "(no text provided, analyze the image)", image_context=image_context)
-
-    content_parts = [prompt_text]
-    if image_bytes and image_mime:
-        content_parts.append(_build_image_part(image_bytes, image_mime))
-
-    try:
-        response = model.generate_content(content_parts)
-        return _safe_parse(response.text)
-    except Exception as e:
-        error_msg = str(e)
-        if "403" in error_msg:
-            raise ValueError("Gemini API Key is invalid or has been reported as leaked. Please generate a new key at https://aistudio.google.com/app/apikey")
-        if "404" in error_msg:
-            raise ValueError(f"Model '{model_name or DEFAULT_MODEL}' not found. Error: {error_msg}")
-        if "429" in error_msg:
-            raise ValueError(f"Rate limit exceeded for model '{model_name or DEFAULT_MODEL}'. Try a different model or wait a moment.")
-        raise ValueError(f"Gemini API Error: {error_msg}")
-
-
-# --------------------------------------------------------------------------- #
-#  Step 2 – Action generation
-# --------------------------------------------------------------------------- #
-
-ACTION_PROMPT_TEMPLATE = """
-You are an action planning engine. Given structured intent data, return ONLY valid JSON — no markdown, no explanation.
-
-Intent data:
-{intent_json}
-
-Return exactly this JSON shape:
-{{
+  "urgency": "<low | medium | high>",
   "user_message": "<a one-sentence friendly summary of what will be done for the user>",
   "actions": [
-    {{
+    {
       "description": "<what to do>",
       "type": "<calendar | email | reminder | task | search | other>",
       "priority": "<low | medium | high>"
-    }}
+    }
   ]
-}}
+}
 
 Generate 1-4 concrete, actionable steps. Infer priority from the urgency field.
 """
 
+async def process_all_in_one_async(user_input: str, image_bytes: bytes = None, image_mime: str = None, model_name: str = None, vision_context: dict = None) -> dict:
+    """Call Gemini to extract intent and generate actions in a single async network request."""
+    model = _get_model(model_name, system_instruction=SYSTEM_INSTRUCTION)
 
-def generate_actions(intent_data: dict, model_name: str = None) -> dict:
-    """Call Gemini to validate intent data and produce actionable steps."""
-    model = _get_model(model_name)
+    image_context = "An image has also been provided by the user. Analyze it together with the text." if image_bytes else ""
+    if vision_context:
+        vision_info = "Google Cloud Vision API has analyzed the image and found the following:\n"
+        if "labels" in vision_context:
+            vision_info += f"Labels: {', '.join(vision_context['labels'])}\n"
+        if "text" in vision_context:
+            vision_info += f"Extracted Text:\n{vision_context['text']}\n"
+        image_context += f"\n\n{vision_info}"
 
-    prompt = ACTION_PROMPT_TEMPLATE.format(
-        intent_json=json.dumps(intent_data, indent=2)
-    )
+    prompt = f"User input: {user_input or '(no text provided, analyze the image)'}\n\n{image_context}"
+
+    content_parts = [prompt]
+    if image_bytes and image_mime:
+        content_parts.append(_build_image_part(image_bytes, image_mime))
+
     try:
-        response = model.generate_content(prompt)
-        return _safe_parse(response.text)
+        # Utilize ASYNC generation to unblock FastAPI's event loop
+        response = await model.generate_content_async(content_parts)
+        return json.loads(response.text)
     except Exception as e:
         error_msg = str(e)
         if "403" in error_msg:
-            raise ValueError("Gemini API Key is invalid or has been reported as leaked. Please generate a new key at https://aistudio.google.com/app/apikey")
+            raise ValueError("Gemini API Key is invalid or has been reported as leaked.")
         if "404" in error_msg:
-            raise ValueError(f"Model '{model_name or DEFAULT_MODEL}' not found. Error: {error_msg}")
+            raise ValueError(f"Model '{model_name or DEFAULT_MODEL}' not found.")
         if "429" in error_msg:
-            raise ValueError(f"Rate limit exceeded for model '{model_name or DEFAULT_MODEL}'. Try a different model or wait a moment.")
+            raise ValueError(f"Rate limit exceeded for model '{model_name or DEFAULT_MODEL}'.")
         raise ValueError(f"Gemini API Error: {error_msg}")

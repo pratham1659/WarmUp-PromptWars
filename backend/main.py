@@ -23,6 +23,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Auth Initialization ──────────────────────────────────────────────────
+from services.auth import initialize_firebase
+initialize_firebase()
+
 # ── Routers ────────────────────────────────────────────────────────────────
 app.include_router(process_router)
 

@@ -1,1 +1,1 @@
-from services.gemini import extract_intent, generate_actions
+from services.gemini import process_all_in_one_async
