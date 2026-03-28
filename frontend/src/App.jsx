@@ -22,7 +22,7 @@ const MOCK_RESPONSE = {
 async function processInput({ text, imagePreview }) {
   // Attempt to call the real backend; fall back to mock on failure
   try {
-    const body = { text };
+    const body = { input: text };
     if (imagePreview) body.imagePreview = imagePreview;
 
     const API_BASE = import.meta.env.VITE_API_URL || '';

@@ -9,20 +9,19 @@ RUN npm install
 
 # Copy all files and build the app
 COPY . .
-# Note: VITE_API_URL should be provided as a build arg or in a .env during build
-# For simplicity, we assume it's set in the environment or passed at runtime if using a proxy.
-# Since Cloud Run injects env vars into the container, we can also use a script to replace them in the bundle.
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Stage 2: Serve the application with Nginx
 FROM nginx:stable-alpine
 
+# Copy the custom Nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 # Copy the build output to Nginx's html directory
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy a custom Nginx configuration if needed
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]

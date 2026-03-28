@@ -1,0 +1,61 @@
+steps:
+  # 1. Build Backend
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/${PROJECT_ID}/backend', './backend']
+  
+  # 2. Push Backend
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/${PROJECT_ID}/backend']
+
+  # 3. Deploy Backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'backend'
+      - '--image'
+      - 'gcr.io/${PROJECT_ID}/backend'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'GEMINI_API_KEY=${_GEMINI_API_KEY}'
+
+  # 4. Get Backend URL and Build Frontend
+  # We use a shell script to get the URL and then build the frontend
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        BACKEND_URL=$$(gcloud run services describe backend --platform managed --region us-central1 --format 'value(status.url)')
+        echo "Backend URL is: $$BACKEND_URL"
+        docker build -t gcr.io/${PROJECT_ID}/frontend --build-arg VITE_API_URL=$$BACKEND_URL ./frontend
+
+  # 5. Push Frontend
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/${PROJECT_ID}/frontend']
+
+  # 6. Deploy Frontend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'frontend'
+      - '--image'
+      - 'gcr.io/${PROJECT_ID}/frontend'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+substitutions:
+  _GEMINI_API_KEY: 'your-api-key-here'
+
+options:
+  substitution_option: 'ALLOW_LOOSE'

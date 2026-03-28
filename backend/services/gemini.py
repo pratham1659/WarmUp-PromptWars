@@ -6,12 +6,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-
-_model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    generation_config={"response_mime_type": "application/json"},
-)
+api_key = os.getenv("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+    _model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash-latest",
+        generation_config={"response_mime_type": "application/json"},
+    )
+else:
+    # Do not crash during import if API key is missing.
+    # We will check it later when the service is actually called.
+    _model = None
 
 # --------------------------------------------------------------------------- #
 #  Helpers
@@ -50,6 +55,8 @@ Return exactly this JSON shape:
 
 def extract_intent(user_input: str) -> dict:
     """Call Gemini to extract intent, entities and urgency from raw input."""
+    if _model is None:
+        raise ValueError("GEMINI_API_KEY not configured")
     prompt = INTENT_PROMPT_TEMPLATE.format(user_input=user_input)
     response = _model.generate_content(prompt)
     return _safe_parse(response.text)
@@ -83,6 +90,8 @@ Generate 1-4 concrete, actionable steps. Infer priority from the urgency field.
 
 def generate_actions(intent_data: dict) -> dict:
     """Call Gemini to validate intent data and produce actionable steps."""
+    if _model is None:
+        raise ValueError("GEMINI_API_KEY not configured")
     prompt = ACTION_PROMPT_TEMPLATE.format(
         intent_json=json.dumps(intent_data, indent=2)
     )
